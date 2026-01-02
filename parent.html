@@ -1,0 +1,514 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { 
+  Heart, 
+  Brain, 
+  Gamepad2, 
+  BarChart3, 
+  MessageSquare, 
+  CheckCircle2, 
+  Clock, 
+  Trophy, 
+  Lightbulb, 
+  ArrowRight,
+  ChevronLeft,
+  Smartphone,
+  User,
+  Star,
+  Home,
+  BookOpen,
+  Settings,
+  LayoutDashboard
+} from 'lucide-react';
+
+// --- Firebase Configuration ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAk2kPuLBqRMkjaKc9QKuoEDYtdvM4p1fI",
+  authDomain: "kidsiq-e2486.firebaseapp.com",
+  databaseURL: "https://kidsiq-e2486-default-rtdb.firebaseio.com",
+  projectId: "kidsiq-e2486",
+  storageBucket: "kidsiq-e2486.firebasestorage.app",
+  messagingSenderId: "595352503444",
+  appId: "1:595352503444:web:adb7d1c332188b98f92081",
+  measurementId: "G-DLH2H4RZ9V"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'kidsiq-e2486';
+
+// --- Translations ---
+const translations = {
+  en: {
+    welcome: "Welcome",
+    ready: "Ready for today?",
+    parentTip: "Parent Tip",
+    dailyActivities: "Daily Activities",
+    viewHistory: "View History",
+    focus: "Current Focus",
+    onboardingTitle: "GrowthGenie",
+    onboardingSub: "Guide your child's growth, screen-free.",
+    createProfile: "Create Profile",
+    nickname: "Child's Nickname",
+    ageGroup: "Age Group",
+    stats: "Growth Reports",
+    aiChat: "AI Assistant",
+    screenFree: "Screen-Free Time",
+    home: "Home",
+    learn: "Learn",
+    back: "Back",
+    steps: "Steps to Follow",
+    expertTip: "Expert Tip",
+    completed: "Mark as Completed",
+    dashboard: "Dashboard"
+  },
+  si: {
+    welcome: "ආයුබෝවන්",
+    ready: "අද දවසේ වැඩ පටන් ගමුද?",
+    parentTip: "දෙමාපිය උපදෙස",
+    dailyActivities: "දවසේ ක්‍රියාකාරකම්",
+    viewHistory: "පසුගිය දත්ත",
+    focus: "අවධානය යොමුකළ යුතු අංශය",
+    onboardingTitle: "GrowthGenie",
+    onboardingSub: "ඔබේ දරුවාගේ වර්ධනයට නිවැරදි මගපෙන්වීම.",
+    createProfile: "ගිණුමක් සාදන්න",
+    nickname: "දරුවාගේ නම (පටබැඳි නම)",
+    ageGroup: "වයස් කාණ්ඩය",
+    stats: "ප්‍රගති වාර්තාව",
+    aiChat: "AI සහකරු",
+    screenFree: "දුරකථනයෙන් තොර කාලය",
+    home: "මුල් පිටුව",
+    learn: "ඉගෙනුම",
+    back: "පස්සට",
+    steps: "අනුගමනය කළ යුතු පියවර",
+    expertTip: "විශේෂඥ උපදෙස",
+    completed: "අවසන් කළ බව සලකුණු කරන්න",
+    dashboard: "පුවරුව"
+  },
+  ta: {
+    welcome: "வரவேற்பு",
+    ready: "இன்றைய செயல்பாடுகளுக்கு தயாரா?",
+    parentTip: "பெற்றோர் குறிப்பு",
+    dailyActivities: "தினசரி செயல்பாடுகள்",
+    viewHistory: "வரலாறு",
+    focus: "தற்போதைய கவனம்",
+    onboardingTitle: "GrowthGenie",
+    onboardingSub: "உங்கள் குழந்தையின் வளர்ச்சியை வழிநடத்துங்கள்.",
+    createProfile: "சுயவிவரத்தை உருவாக்கு",
+    nickname: "குழந்தையின் பெயர்",
+    ageGroup: "வயது பிரிவு",
+    stats: "வளர்ச்சி அறிக்கை",
+    aiChat: "AI உதவியாளர்",
+    screenFree: "திரையற்ற நேரம்",
+    home: "முகப்பு",
+    learn: "கற்றல்",
+    back: "பின்னால்",
+    steps: "பின்பற்ற வேண்டிய படிகள்",
+    expertTip: "நிபுணுர் குறிப்பு",
+    completed: "முடிந்தது என குறிக்கவும்",
+    dashboard: "தகவல்தளம்"
+  }
+};
+
+const getActivities = (lang) => [
+  {
+    id: 1,
+    title: lang === 'si' ? "පාට වෙන් කිරීමේ ක්‍රීඩාව" : lang === 'ta' ? "வண்ணங்களை பிரிக்கும் விளையாட்டு" : "The Color Sorting Game",
+    time: "10 min",
+    difficulty: "Easy",
+    skills: ["Logic", "Motor Skills"],
+    description: "Gather 5 household objects of different colors. Ask your child to sort them into groups.",
+    tip: lang === 'si' ? "දරුවා වචන හඳුනාගැනීමට පාට වල නම් පවසන්න." : "Explain the color names as they pick them up.",
+    type: "Brain Game",
+    steps: ["Step 1...", "Step 2..."]
+  },
+  {
+    id: 2,
+    title: lang === 'si' ? "තාලයට අත්පුඩි ගැසීම" : lang === 'ta' ? "தாளத்திற்கு கைதட்டுதல்" : "Rhythm Clap",
+    time: "5 min",
+    difficulty: "Medium",
+    skills: ["Focus", "Music"],
+    description: "Clap a simple rhythm and ask your child to repeat it.",
+    tip: lang === 'si' ? "දරුවාගේ මතක ශක්තිය වර්ධනය කිරීමට මෙය උපකාරී වේ." : "This builds auditory memory.",
+    type: "Music & Rhythm",
+    steps: ["Step 1...", "Step 2..."]
+  }
+];
+
+const SKILLS_DATA = [
+  { name: 'Language', value: 75, color: '#3B82F6' },
+  { name: 'Logic', value: 60, color: '#8B5CF6' },
+  { name: 'Emotional', value: 85, color: '#F43F5E' },
+  { name: 'Motor', value: 45, color: '#F59E0B' },
+  { name: 'Focus', value: 55, color: '#14B8A6' },
+];
+
+// --- Nav Components ---
+const NavItem = ({ icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${active ? 'bg-teal-50 text-teal-700' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
+
+const MobileNavItem = ({ icon, label, active, onClick }) => (
+  <button onClick={onClick} className={`flex flex-col items-center gap-1 ${active ? 'text-teal-600' : 'text-slate-400'}`}>
+    {icon}
+    <span className="text-[10px] font-bold">{label}</span>
+  </button>
+);
+
+// --- Main App ---
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('loading'); 
+  const [lang, setLang] = useState('si'); 
+  const [childProfile, setChildProfile] = useState({
+    name: '',
+    ageGroup: '3-4'
+  });
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [authError, setAuthError] = useState(null);
+
+  const t = translations[lang];
+
+  // 1. Firebase Auth Initializer
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          // RULE 3: Auth BEFORE Queries. 
+          // Note: If you see 'auth/configuration-not-found', 
+          // please enable Anonymous Auth in Firebase Console -> Authentication -> Sign-in method
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error", err);
+        setAuthError(err.message);
+        // Fallback to allow usage even if auth fails initially
+        setView('onboarding'); 
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Data Fetcher & Auto-login Logic
+  useEffect(() => {
+    if (!user) return;
+
+    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'details');
+
+    const unsubscribe = onSnapshot(profileRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setChildProfile(data);
+        setLang(data.lang || 'si');
+        setView('dashboard');
+      } else {
+        setView('onboarding');
+      }
+    }, (error) => {
+      console.error("Firestore read error", error);
+      setView('onboarding');
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // 3. Save Profile to Cloud
+  const saveProfileToCloud = async () => {
+    if (!user) {
+        // Local only fallback if auth fails
+        setView('dashboard');
+        return;
+    }
+    try {
+      const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'details');
+      await setDoc(profileRef, {
+        ...childProfile,
+        lang: lang,
+        updatedAt: new Date().toISOString()
+      });
+      setView('dashboard');
+    } catch (err) {
+      console.error("Firestore save error", err);
+      // Fallback for UI
+      setView('dashboard');
+    }
+  };
+
+  // --- Sub-views ---
+  const WebWrapper = ({ children }) => (
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-200 fixed h-full z-40">
+        <div className="p-6 flex items-center gap-3">
+          <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+            <Heart fill="currentColor" size={24} />
+          </div>
+          <span className="text-xl font-bold tracking-tight">{t.onboardingTitle}</span>
+        </div>
+        <nav className="flex-1 px-4 space-y-2 mt-4">
+          <NavItem icon={<Home size={20}/>} label={t.home} active={view === 'dashboard'} onClick={() => setView('dashboard')} />
+          <NavItem icon={<BarChart3 size={20}/>} label={t.stats} active={view === 'stats'} onClick={() => setView('stats')} />
+          <NavItem icon={<MessageSquare size={20}/>} label={t.aiChat} active={view === 'chat'} onClick={() => setView('chat')} />
+          <NavItem icon={<BookOpen size={20}/>} label={t.learn} />
+        </nav>
+        <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+             <div className="w-8 h-8 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center font-bold">
+               {childProfile.name ? childProfile.name[0] : 'P'}
+             </div>
+             <div className="flex-1 overflow-hidden">
+               <p className="text-xs font-bold truncate">{childProfile.name || 'Parent'}</p>
+               <p className="text-[10px] text-slate-400">{childProfile.ageGroup} Years</p>
+             </div>
+             <button onClick={() => setView('onboarding')} className="text-slate-400 hover:text-teal-600">
+               <Settings size={16} />
+             </button>
+          </div>
+        </div>
+      </aside>
+      <main className="flex-1 lg:ml-64 relative">
+        <div className="max-w-5xl mx-auto pb-24 lg:pb-8">
+          {children}
+        </div>
+      </main>
+      {view !== 'onboarding' && view !== 'screenfree' && (
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-100 flex justify-around items-center py-4 px-2 z-50">
+          <MobileNavItem icon={<Home size={24}/>} label={t.home} active={view === 'dashboard'} onClick={() => setView('dashboard')} />
+          <MobileNavItem icon={<BarChart3 size={24}/>} label={t.stats} active={view === 'stats'} onClick={() => setView('stats')} />
+          <button onClick={() => setView('screenfree')} className="w-14 h-14 bg-teal-600 rounded-full flex items-center justify-center text-white shadow-lg -mt-10 border-4 border-white transition-transform active:scale-90"><Smartphone size={28} /></button>
+          <MobileNavItem icon={<MessageSquare size={24}/>} label={t.aiChat} active={view === 'chat'} onClick={() => setView('chat')} />
+          <MobileNavItem icon={<BookOpen size={24}/>} label={t.learn} />
+        </nav>
+      )}
+    </div>
+  );
+
+  if (view === 'loading') return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Heart className="text-teal-600 animate-pulse" size={48} /></div>;
+
+  const OnboardingView = () => (
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white p-6 flex items-center justify-center">
+      <div className="max-w-4xl w-full grid lg:grid-cols-2 gap-12 items-center bg-white p-8 lg:p-12 rounded-[40px] shadow-2xl shadow-teal-900/5">
+        <div className="hidden lg:block space-y-6">
+          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center shadow-lg"><Heart className="text-white w-8 h-8" fill="currentColor" /></div>
+          <h1 className="text-5xl font-black text-slate-900 leading-tight">Nurture Your<br/>Child's Future.</h1>
+          <p className="text-lg text-slate-500 max-w-sm">{t.onboardingSub}</p>
+        </div>
+        <div className="space-y-8">
+          <div className="text-center lg:text-left">
+            <h2 className="text-3xl font-bold text-slate-800">{t.createProfile}</h2>
+            <div className="flex gap-2 mt-4 justify-center lg:justify-start">
+              {['en', 'si', 'ta'].map(l => (
+                <button key={l} onClick={() => setLang(l)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${lang === l ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-400 border-slate-100 hover:border-teal-200'}`}>
+                  {l === 'en' ? 'English' : l === 'si' ? 'සිංහල' : 'தமிழ்'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {authError && (
+            <div className="p-4 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100">
+              <strong>Firebase Error:</strong> Anonymous Authentication enable karne garajiche ahe. 
+              Krupaya Firebase Console -> Authentication madhe jaaun "Anonymous" enable kara.
+            </div>
+          )}
+
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wider">{t.nickname}</label>
+              <input 
+                type="text" 
+                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all"
+                placeholder="e.g. Chuti Putha"
+                value={childProfile.name}
+                onChange={(e) => setChildProfile({...childProfile, name: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wider">{t.ageGroup}</label>
+              <div className="grid grid-cols-3 gap-3">
+                {['3-4', '4-5', '5-6'].map(age => (
+                  <button key={age} onClick={() => setChildProfile({...childProfile, ageGroup: age})} className={`py-4 rounded-2xl border-2 transition-all font-bold ${childProfile.ageGroup === age ? 'bg-teal-600 text-white border-teal-600 shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}>
+                    {age}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button disabled={!childProfile.name} onClick={saveProfileToCloud} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold shadow-xl hover:bg-slate-800 disabled:opacity-30 flex items-center justify-center gap-2 transition-all active:scale-95">
+              {t.createProfile} <ArrowRight size={20} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const Dashboard = () => (
+    <WebWrapper>
+      <div className="p-6 lg:p-10 space-y-8">
+        <header className="flex justify-between items-end">
+          <div>
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-1">{t.welcome}, {childProfile.name}!</p>
+            <h1 className="text-3xl font-black text-slate-900">{t.ready}</h1>
+          </div>
+          <div className="hidden md:flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm text-sm font-bold text-slate-500">
+            <Clock size={16} className="text-teal-500" /> Today: {new Date().toLocaleDateString()}
+          </div>
+        </header>
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 bg-gradient-to-br from-teal-600 to-emerald-700 p-8 rounded-[40px] text-white shadow-2xl relative overflow-hidden group">
+            <div className="relative z-10 max-w-md space-y-4">
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"><Lightbulb size={14} className="text-yellow-300" /> {t.parentTip}</div>
+              <h2 className="text-2xl lg:text-3xl font-bold leading-tight">
+                {lang === 'si' ? "\"දරුවාට සෘජුව 'එපා' යන්න පවසනවා වෙනුවට වෙනත් විකල්පයක් හඳුන්වා දෙන්න.\"" : lang === 'ta' ? "\"குழந்தையிடம் நேரடியாக 'வேண்டாம்' என்று சொல்வதற்கு பதிலாக வேறு வழியை காட்டவும்.\"" : "\"Try to avoid saying 'No' directly. Use 'Let's do this instead'.\""}
+              </h2>
+              <button className="flex items-center gap-2 font-bold text-sm bg-white text-teal-700 px-5 py-2.5 rounded-xl transition-transform active:scale-95">Learn More <ArrowRight size={16} /></button>
+            </div>
+            <Brain size={220} className="absolute -right-12 -bottom-12 opacity-10 group-hover:scale-110 transition-transform duration-700" />
+          </div>
+          <div className="bg-rose-50 p-8 rounded-[40px] border border-rose-100 flex flex-col justify-between">
+            <div className="space-y-1">
+              <span className="text-rose-500 text-xs font-bold uppercase tracking-widest">{t.focus}</span>
+              <h4 className="text-2xl font-bold text-slate-800">{lang === 'si' ? "චිත්තවේගීය සමබරතාවය" : lang === 'ta' ? "உணர்ச்சி சமநிலை" : "Emotional Balance"}</h4>
+            </div>
+            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-rose-500 shadow-xl shadow-rose-900/5 mt-6"><Heart fill="currentColor" size={40} /></div>
+          </div>
+        </div>
+        <section>
+          <div className="flex justify-between items-end mb-6"><h3 className="text-2xl font-bold text-slate-800">{t.dailyActivities}</h3><button className="text-teal-600 font-bold hover:underline transition-all">{t.viewHistory}</button></div>
+          <div className="grid md:grid-cols-2 gap-6">
+            {getActivities(lang).map(act => (
+              <div key={act.id} onClick={() => { setSelectedActivity(act); setView('activity'); }} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex items-start gap-6">
+                <div className={`w-16 h-16 rounded-[24px] flex-shrink-0 flex items-center justify-center transition-colors ${act.id === 1 ? 'bg-orange-50 text-orange-500 group-hover:bg-orange-500 group-hover:text-white' : 'bg-purple-50 text-purple-500 group-hover:bg-purple-500 group-hover:text-white'}`}>{act.id === 1 ? <Gamepad2 size={32} /> : <Brain size={32} />}</div>
+                <div className="flex-1">
+                  <h4 className="text-xl font-bold text-slate-800 mb-1">{act.title}</h4>
+                  <div className="flex items-center gap-4 text-slate-400 text-sm font-medium"><span className="flex items-center gap-1.5"><Clock size={16} /> {act.time}</span><span className="flex items-center gap-1.5"><Trophy size={16} /> {act.difficulty}</span></div>
+                </div>
+                <div className="w-10 h-10 rounded-full border border-slate-50 flex items-center justify-center text-slate-200 group-hover:text-teal-600 transition-colors"><ArrowRight size={20} /></div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </WebWrapper>
+  );
+
+  const ActivityDetail = () => (
+    <WebWrapper>
+      <div className="p-6 lg:p-10 max-w-3xl mx-auto">
+        <button onClick={() => setView('dashboard')} className="flex items-center gap-2 text-slate-400 font-bold mb-8 hover:text-slate-600 transition-colors"><ChevronLeft size={20} /> {t.back}</button>
+        <div className="space-y-8">
+          {selectedActivity && (
+            <div className="bg-white p-10 rounded-[48px] shadow-sm border border-slate-100 space-y-6">
+              <div className="flex items-center gap-4">
+                 <div className="px-4 py-1.5 bg-teal-50 text-teal-600 rounded-full text-xs font-bold uppercase tracking-widest">{selectedActivity.type}</div>
+                 <div className="px-4 py-1.5 bg-slate-50 text-slate-400 rounded-full text-xs font-bold uppercase tracking-widest">{selectedActivity.difficulty}</div>
+              </div>
+              <h1 className="text-4xl font-black text-slate-900">{selectedActivity.title}</h1>
+              <p className="text-lg text-slate-500 leading-relaxed">{selectedActivity.description}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Time Needed</p><p className="text-xl font-bold text-slate-800">{selectedActivity.time}</p></div>
+                <div className="p-4 bg-slate-50 rounded-2xl"><p className="text-xs font-bold text-slate-400 uppercase mb-1">Main Skills</p><p className="text-xl font-bold text-slate-800">{selectedActivity.skills[0]}</p></div>
+              </div>
+            </div>
+          )}
+          <section className="space-y-4 px-4">
+            <h3 className="text-2xl font-bold text-slate-800">{t.steps}</h3>
+            <div className="space-y-4">
+              {selectedActivity?.steps.map((step, i) => (
+                <div key={i} className="flex gap-4 p-4 rounded-2xl hover:bg-white hover:shadow-sm transition-all border border-transparent hover:border-slate-50">
+                  <div className="w-8 h-8 bg-slate-900 text-white rounded-full flex-shrink-0 flex items-center justify-center font-bold text-sm">{i + 1}</div>
+                  <p className="text-slate-600 font-medium pt-1">{step}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+          <div className="bg-amber-50 p-8 rounded-[32px] border border-amber-100 flex gap-5">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-500 flex-shrink-0"><Lightbulb size={28} /></div>
+            <div><span className="text-xs font-black text-amber-600 uppercase tracking-widest">{t.expertTip}</span><p className="text-slate-700 font-medium mt-1 leading-relaxed">{selectedActivity?.tip}</p></div>
+          </div>
+          <button onClick={() => setView('dashboard')} className="w-full py-6 bg-teal-600 text-white rounded-3xl font-black text-lg shadow-2xl hover:bg-teal-700 transition-all active:scale-[0.98] flex items-center justify-center gap-3"><CheckCircle2 size={24} /> {t.completed}</button>
+        </div>
+      </div>
+    </WebWrapper>
+  );
+
+  const ProgressView = () => (
+    <WebWrapper>
+      <div className="p-6 lg:p-10 space-y-8">
+        <header><h1 className="text-3xl font-black text-slate-900">{t.stats}</h1><p className="text-slate-400 font-medium">Tracking {childProfile.name}'s key development milestones.</p></header>
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 space-y-6">
+            <h3 className="text-xl font-bold text-slate-800">Skill Breakdown</h3>
+            <div className="space-y-6">
+              {SKILLS_DATA.map(skill => (
+                <div key={skill.name} className="space-y-2">
+                  <div className="flex justify-between items-end"><span className="text-sm font-bold text-slate-600 uppercase tracking-wider">{skill.name}</span><span className="text-sm font-black text-slate-900">{skill.value}%</span></div>
+                  <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${skill.value}%`, backgroundColor: skill.color }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center space-y-4">
+             <div className="w-24 h-24 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center"><Trophy size={48} /></div>
+             <h3 className="text-2xl font-bold text-slate-800">Weekly Achievement</h3>
+             <p className="text-slate-500 max-w-xs">You've completed 5 activities this week. That's 20% more than last week!</p>
+             <button className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm">Download PDF Report</button>
+          </div>
+        </div>
+      </div>
+    </WebWrapper>
+  );
+
+  const ChatView = () => (
+    <WebWrapper>
+      <div className="h-screen flex flex-col">
+        <div className="p-6 lg:p-10 border-b border-slate-100 bg-white/50 backdrop-blur-md"><h1 className="text-3xl font-black text-slate-900">{t.aiChat}</h1><p className="text-slate-400 font-medium">{lang === 'si' ? "දරුවා ගැන ඕනෑම දෙයක් අසන්න" : "Ask anything about your child"}</p></div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col"><div className="max-w-md bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-100 self-start"><p className="text-slate-600 font-medium">{lang === 'si' ? "ආයුබෝවන්! මම ඔබේ සහකරු. අද ඔබට උදව් කරන්නේ කෙසේද?" : "Hello! I'm your parenting assistant. How can I help you today?"}</p></div></div>
+        <div className="p-6 bg-white border-t border-slate-100">
+           <div className="max-w-3xl mx-auto flex gap-3"><input type="text" placeholder="Type your question..." className="flex-1 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none focus:border-teal-500 transition-all font-medium" /><button className="w-14 h-14 bg-teal-600 text-white rounded-2xl flex items-center justify-center shadow-lg hover:bg-teal-700 active:scale-95 transition-all"><ArrowRight size={24} /></button></div>
+        </div>
+      </div>
+    </WebWrapper>
+  );
+
+  const ScreenFreeView = () => (
+    <div className="min-h-screen bg-slate-950 text-white p-8 flex flex-col justify-center items-center text-center space-y-10 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-teal-500/10 via-transparent opacity-50" />
+      <div className="relative z-10 space-y-4">
+        <div className="w-32 h-32 bg-teal-500/20 rounded-[40px] flex items-center justify-center mx-auto border border-teal-500/30 animate-pulse"><Smartphone size={60} className="text-teal-400" /></div>
+        <h1 className="text-4xl lg:text-5xl font-black tracking-tight">{t.screenFree}</h1>
+        <p className="text-slate-400 text-lg max-w-sm mx-auto">It's quality time with {childProfile.name}. Put the phone away and enjoy the moment!</p>
+      </div>
+      <div className="relative z-10 w-full max-w-md bg-white/5 backdrop-blur-xl p-8 rounded-[40px] border border-white/10 space-y-6"><div className="flex items-center justify-center gap-2 text-teal-400 font-black text-5xl">25:00</div><p className="text-xs font-bold uppercase tracking-[0.3em] text-slate-500">Mindful Session Active</p></div>
+      <button onClick={() => setView('dashboard')} className="relative z-10 text-slate-500 font-bold hover:text-white transition-colors flex items-center gap-2"><ChevronLeft size={18} /> {t.back}</button>
+    </div>
+  );
+
+  return (
+    <div className="font-sans">
+      {view === 'onboarding' && <OnboardingView />}
+      {view === 'dashboard' && <Dashboard />}
+      {view === 'activity' && <ActivityDetail />}
+      {view === 'stats' && <ProgressView />}
+      {view === 'chat' && <ChatView />}
+      {view === 'screenfree' && <ScreenFreeView />}
+    </div>
+  );
+};
+
+export default App;
